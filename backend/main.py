@@ -1,0 +1,234 @@
+"""
+FastAPI Server for QR Reader System
+Provides endpoints for decoding uploaded QR images, parsing raw QR payloads,
+and generating customized sample QR codes.
+"""
+
+import time
+from typing import List, Optional, Dict, Any
+from fastapi import FastAPI, File, UploadFile, HTTPException, Body
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+from parser import QRDataParser, StructuredQRResult
+from decoder import QRImageDecoder
+from generator import QRGenerator
+
+app = FastAPI(
+    title="QR Reader System API",
+    description="High-performance QR decoder & intelligent payload structuring engine",
+    version="1.0.0"
+)
+
+# Enable CORS for frontend development and production
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+class ParseRequest(BaseModel):
+    raw_data: str = Field(..., description="Raw decoded QR text payload")
+
+
+class GenerateRequest(BaseModel):
+    qr_type: str = Field(..., description="Type: url, wifi, upi, contact, email, sms, tel, geo, text")
+    params: Dict[str, Any] = Field(default_factory=dict, description="Parameters for the QR format")
+    fill_color: str = Field(default="#0f172a", description="Hex or name of foreground color")
+    back_color: str = Field(default="#ffffff", description="Hex or name of background color")
+
+
+class ScanResponse(BaseModel):
+    success: bool
+    processing_time_ms: float
+    results_count: int
+    results: List[StructuredQRResult]
+    image_metadata: Optional[Dict[str, Any]] = None
+    message: Optional[str] = None
+
+
+@app.get("/api/health")
+def health_check():
+    return {
+        "status": "online",
+        "service": "QR Reader System API",
+        "timestamp": time.time()
+    }
+
+
+@app.post("/api/scan/image", response_model=ScanResponse)
+async def scan_image(file: UploadFile = File(...)):
+    """
+    Accepts an uploaded image file (PNG, JPG, WEBP, etc.), runs the multi-pass OpenCV
+    preprocessing pipeline, detects QR codes, and returns parsed structured JSON.
+    """
+    start_time = time.perf_counter()
+
+    if not file.content_type or not file.content_type.startswith("image/"):
+        # Allow standard image extensions even if mime is generic
+        ext = (file.filename or "").lower().split(".")[-1]
+        if ext not in ["png", "jpg", "jpeg", "webp", "bmp", "tiff", "gif", "svg"]:
+            raise HTTPException(status_code=400, detail="Uploaded file must be a valid image format.")
+
+    try:
+        image_bytes = await file.read()
+        if len(image_bytes) == 0:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+        decoded_items, metadata = QRImageDecoder.decode_image_bytes(image_bytes)
+        
+        parsed_results: List[StructuredQRResult] = []
+        for item in decoded_items:
+            res = QRDataParser.parse(item.raw_data)
+            # Attach detection details to parsed details
+            res.parsed_details["_detection"] = {
+                "format": item.format_name,
+                "confidence": item.confidence,
+                "points": item.points
+            }
+            parsed_results.append(res)
+
+        elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+
+        if not parsed_results:
+            return ScanResponse(
+                success=False,
+                processing_time_ms=elapsed_ms,
+                results_count=0,
+                results=[],
+                image_metadata=metadata,
+                message="No QR code found in the image. Try adjusting lighting or uploading a higher contrast photo."
+            )
+
+        return ScanResponse(
+            success=True,
+            processing_time_ms=elapsed_ms,
+            results_count=len(parsed_results),
+            results=parsed_results,
+            image_metadata=metadata,
+            message="QR code decoded and structured successfully."
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing image: {str(e)}"
+        )
+
+
+@app.post("/api/parse", response_model=StructuredQRResult)
+def parse_raw_data(payload: ParseRequest):
+    """
+    Parses a raw QR string (e.g. from the client-side html5-qrcode camera scanner)
+    and returns the structured JSON model with validated fields and actions.
+    """
+    return QRDataParser.parse(payload.raw_data)
+
+
+@app.post("/api/generate")
+def generate_qr(req: GenerateRequest):
+    """
+    Builds standard QR raw data and returns both the structured data and base64 PNG image.
+    """
+    raw_data = QRGenerator.build_raw_string(req.qr_type, req.params)
+    base64_image = QRGenerator.generate_qr_base64(
+        raw_data,
+        fill_color=req.fill_color,
+        back_color=req.back_color
+    )
+    parsed = QRDataParser.parse(raw_data)
+
+    return {
+        "raw_data": raw_data,
+        "image_data_url": base64_image,
+        "structured": parsed
+    }
+
+
+@app.get("/api/sample-qrs")
+def get_sample_qrs():
+    """
+    Provides pre-generated sample QR codes across all supported categories
+    for instant 1-click testing in the UI.
+    """
+    samples = [
+        {
+            "id": "wifi_home",
+            "name": "Home WiFi (WPA2)",
+            "type": "wifi",
+            "description": "WiFi network with WPA2 security and password",
+            "params": {"ssid": "FiberOptic_5G_Guest", "auth_type": "WPA", "password": "SecretPassword2026", "hidden": False}
+        },
+        {
+            "id": "upi_store",
+            "name": "UPI Payment (₹450)",
+            "type": "upi",
+            "description": "Instant Indian UPI merchant payment link",
+            "params": {"payee_vpa": "coffeeshop@icici", "payee_name": "Artisan Coffee House", "amount": "450.00", "currency": "INR", "note": "Order #4821 Latte & Croissant"}
+        },
+        {
+            "id": "vcard_alex",
+            "name": "Executive vCard",
+            "type": "contact",
+            "description": "Full contact card with phone, email, org, and title",
+            "params": {
+                "name": "Sarah Connor",
+                "first_name": "Sarah",
+                "last_name": "Connor",
+                "organization": "Cyberdyne Systems",
+                "title": "Lead Security Architect",
+                "phone": "+1 (555) 019-2834",
+                "email": "sarah.connor@cyberdyne.tech",
+                "url": "https://cyberdyne.tech",
+                "note": "Met at Tech Innovators Summit 2026"
+            }
+        },
+        {
+            "id": "url_docs",
+            "name": "Secure Web Link",
+            "type": "url",
+            "description": "HTTPS URL with UTM parameters and tracking",
+            "params": {"url": "https://github.com/google/gemini?source=qr_reader&campaign=demo2026"}
+        },
+        {
+            "id": "geo_monument",
+            "name": "Taj Mahal Coordinates",
+            "type": "geo",
+            "description": "GPS Location coordinates with query pin",
+            "params": {"latitude": "27.1751", "longitude": "78.0421", "query": "Taj Mahal, Agra"}
+        },
+        {
+            "id": "email_support",
+            "name": "Feedback Email",
+            "type": "email",
+            "description": "Pre-filled customer support email template",
+            "params": {"to": "support@qrreader.app", "subject": "Bug Report & Feedback", "body": "Hello Support Team,\n\nI tested the QR Reader System and..."}
+        },
+        {
+            "id": "crypto_btc",
+            "name": "Bitcoin Wallet",
+            "type": "text",
+            "description": "Bitcoin receiving address format",
+            "params": {"text": "bitcoin:1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa?amount=0.025&message=Donation"}
+        }
+    ]
+
+    # Pre-render images for samples
+    for sample in samples:
+        raw = QRGenerator.build_raw_string(sample["type"], sample["params"])
+        sample["raw_data"] = raw
+        sample["image_data_url"] = QRGenerator.generate_qr_base64(raw)
+        sample["parsed"] = QRDataParser.parse(raw)
+
+    return {"samples": samples}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
