@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Download, QrCode, Image as ImageIcon, Loader2, RefreshCw, Check } from 'lucide-react';
+import { Sparkles, Download, Image as ImageIcon, Loader2, RefreshCw, Check } from 'lucide-react';
 import { generateProductImage } from '../services/api';
 
 const CATEGORIES = [
@@ -20,7 +20,7 @@ const THEMES = [
   { id: 'warm_wood', label: 'Warm Amber', color: '#fffbeb' },
 ];
 
-export const ProductImageGenerator = ({ onGenerateQR }) => {
+export const ProductImageGenerator = () => {
   const [productName, setProductName] = useState('SonicPro Wireless Headphones');
   const [category, setCategory] = useState('electronics');
   const [tagline, setTagline] = useState('Active Noise Cancelling & Spatial Audio');
@@ -224,24 +224,14 @@ export const ProductImageGenerator = ({ onGenerateQR }) => {
                 />
               </div>
 
-              <div className="flex gap-2 w-full pt-1">
+              <div className="w-full pt-1">
                 <button
                   onClick={handleDownload}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-xs"
+                  className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold transition flex items-center justify-center gap-2 shadow-xs"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Download Image</span>
+                  <span>Download Product Image</span>
                 </button>
-                {onGenerateQR && (
-                  <button
-                    onClick={() => onGenerateQR(productName, price)}
-                    className="py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-xs"
-                    title="Generate QR code for this product"
-                  >
-                    <QrCode className="w-4 h-4" />
-                    <span>Create QR</span>
-                  </button>
-                )}
               </div>
             </div>
           ) : (
@@ -262,3 +252,4 @@ export const ProductImageGenerator = ({ onGenerateQR }) => {
     </div>
   );
 };
+

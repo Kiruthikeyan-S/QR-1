@@ -146,7 +146,7 @@ export function App() {
 
         {/* 2. VIEW: Product Image Studio */}
         {currentView === 'image-gen' && (
-          <ProductImageGenerator onGenerateQR={handleCreateQRFromText} />
+          <ProductImageGenerator />
         )}
 
         {/* 3. VIEW: Text Generation & Correction */}
