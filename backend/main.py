@@ -45,11 +45,12 @@ class GenerateRequest(BaseModel):
 
 
 class ProductImageRequest(BaseModel):
-    product_name: str = Field(..., description="Name of the product to render")
+    product_name: Optional[str] = Field(default="", description="Name of the product to render")
+    prompt: Optional[str] = Field(default=None, description="Custom AI image generation prompt")
     category: str = Field(default="electronics", description="Category: electronics, footwear, fashion, watches, cosmetics, beverages, furniture, general")
     tagline: str = Field(default="Premium Quality & Ergonomic Design", description="Short marketing tagline")
     price: str = Field(default="$99.00", description="Product price string")
-    badge: str = Field(default="FEATURED PRODUCT", description="Product highlight badge")
+    badge: str = Field(default="BESTSELLER", description="Product highlight badge")
     theme: str = Field(default="studio_white", description="Theme: studio_white, luxury_marble, minimalist_pastel, cyber_clean, warm_wood")
 
 
@@ -179,7 +180,8 @@ def generate_product_image(req: ProductImageRequest):
     """
     try:
         data_url = ProductImageStudio.generate_product_image(
-            product_name=req.product_name,
+            product_name=req.product_name or "",
+            prompt=req.prompt,
             category=req.category,
             tagline=req.tagline,
             price=req.price,

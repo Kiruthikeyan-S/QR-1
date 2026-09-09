@@ -9,6 +9,7 @@ import io
 import base64
 import math
 import re
+import urllib.parse
 import httpx
 from typing import Dict, Any, List, Optional
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
@@ -251,20 +252,48 @@ class ProductImageStudio:
     @classmethod
     def generate_product_image(
         cls,
-        product_name: str,
+        product_name: str = "",
         category: str = "electronics",
         tagline: str = "Premium Quality & Ergonomic Design",
         price: str = "$199.00",
         badge: str = "BESTSELLER",
         theme: str = "studio_white",
-        width: int = 800,
-        height: int = 800
+        prompt: Optional[str] = None,
+        width: int = 768,
+        height: int = 768
     ) -> str:
+        # 1. Real AI Image Generation via Turbo Model
+        if prompt and prompt.strip():
+            final_prompt = prompt.strip()
+        else:
+            theme_styles = {
+                "studio_white": "isolated on clean minimalist white studio backdrop, soft commercial softbox lighting, crisp reflections",
+                "luxury_marble": "on luxury dark marble surface, dramatic rim lighting, gold reflections, premium commercial showcase",
+                "minimalist_pastel": "on soft pastel podium, warm natural studio light, aesthetic modern product photography",
+                "cyber_clean": "on futuristic dark pedestal, subtle glowing cyan accents, cinematic studio lighting",
+                "warm_wood": "on warm polished amber wood table, cozy studio lighting, luxury aesthetic"
+            }
+            theme_desc = theme_styles.get(theme, "clean studio lighting, commercial product photography")
+            clean_name = product_name.strip() if product_name else "luxury product"
+            final_prompt = f"Professional commercial product photography of {clean_name}, {theme_desc}, 8k resolution, ultra detailed, photorealistic, centered, advertising quality"
+
+        try:
+            encoded = urllib.parse.quote(final_prompt)
+            ai_url = f"https://image.pollinations.ai/prompt/{encoded}?width={width}&height={height}&nologo=true&model=turbo"
+            with httpx.Client(verify=False, timeout=12.0) as client:
+                resp = client.get(ai_url)
+                if resp.status_code == 200 and len(resp.content) > 1500:
+                    b64 = base64.b64encode(resp.content).decode("utf-8")
+                    return f"data:image/png;base64,{b64}"
+        except Exception:
+            pass
+
+        # 2. Vector Studio Visualizer Fallback
         t = cls.THEMES.get(theme, cls.THEMES["studio_white"])
         img = Image.new("RGB", (width, height), t["bg_top"])
         draw = ImageDraw.Draw(img)
 
-        # 1. Gradient Studio Background
+        # Gradient Studio Background
         for y in range(height):
             ratio = y / float(height)
             r = int(t["bg_top"][0] * (1 - ratio) + t["bg_bottom"][0] * ratio)
