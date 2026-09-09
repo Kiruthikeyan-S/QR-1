@@ -69,16 +69,33 @@ class GroqAIService:
         return None
 
 
+def _get_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
+    """Safely loads system TrueType fonts on Windows or falls back gracefully."""
+    font_names = (
+        ['arialbd.ttf', 'segoeuib.ttf', 'calibrib.ttf', 'tahomabd.ttf']
+        if bold else
+        ['arial.ttf', 'segoeui.ttf', 'calibri.ttf', 'tahoma.ttf']
+    )
+    for name in font_names:
+        try:
+            return ImageFont.truetype(name, size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+
 class ProductImageStudio:
-    """Generates high-resolution studio showcase product images."""
+    """Generates high-resolution studio showcase product images with category artwork."""
 
     THEMES = {
         "studio_white": {
             "bg_top": (255, 255, 255),
-            "bg_bottom": (238, 242, 246),
+            "bg_bottom": (235, 240, 248),
             "pedestal_top": (245, 248, 252),
-            "pedestal_side": (210, 220, 230),
+            "pedestal_side": (205, 215, 228),
             "accent": (16, 185, 129),
+            "card_bg": (255, 255, 255),
+            "card_border": (226, 232, 240),
             "text": (15, 23, 42),
             "subtext": (100, 116, 139)
         },
@@ -88,15 +105,19 @@ class ProductImageStudio:
             "pedestal_top": (51, 65, 85),
             "pedestal_side": (30, 41, 59),
             "accent": (245, 158, 11),
+            "card_bg": (30, 41, 59),
+            "card_border": (71, 85, 105),
             "text": (255, 255, 255),
             "subtext": (148, 163, 184)
         },
         "minimalist_pastel": {
             "bg_top": (254, 242, 242),
             "bg_bottom": (240, 253, 250),
-            "pedestal_top": (224, 242, 254),
-            "pedestal_side": (186, 230, 253),
+            "pedestal_top": (255, 255, 255),
+            "pedestal_side": (224, 231, 255),
             "accent": (14, 165, 233),
+            "card_bg": (255, 255, 255),
+            "card_border": (243, 232, 255),
             "text": (30, 41, 59),
             "subtext": (100, 116, 139)
         },
@@ -106,30 +127,126 @@ class ProductImageStudio:
             "pedestal_top": (30, 41, 59),
             "pedestal_side": (15, 23, 42),
             "accent": (6, 182, 212),
+            "card_bg": (15, 23, 42),
+            "card_border": (30, 58, 138),
             "text": (248, 250, 252),
             "subtext": (148, 163, 184)
         },
         "warm_wood": {
             "bg_top": (255, 251, 235),
             "bg_bottom": (254, 243, 199),
-            "pedestal_top": (245, 158, 11),
-            "pedestal_side": (180, 83, 9),
+            "pedestal_top": (255, 255, 255),
+            "pedestal_side": (217, 119, 6),
             "accent": (217, 119, 6),
+            "card_bg": (255, 255, 255),
+            "card_border": (253, 230, 138),
             "text": (69, 26, 3),
             "subtext": (146, 64, 14)
         }
     }
 
-    CATEGORY_SYMBOLS = {
-        "electronics": ("⚡", "ELECTRONICS & GADGETS", "HIGH PERFORMANCE • SMART CORE"),
-        "footwear": ("👟", "FOOTWEAR & SNEAKERS", "PREMIUM CUSHION • DURABLE SOLE"),
-        "fashion": ("✨", "APPAREL & FASHION", "LUXURY COTTON • MODERN FIT"),
-        "watches": ("⌚", "LUXURY TIMEPIECE", "CHRONOGRAPH • SAPPHIRE GLASS"),
-        "cosmetics": ("🌿", "BEAUTY & SKINCARE", "ORGANIC EXTRACT • DERMA TESTED"),
-        "beverages": ("☕", "ARTISAN BEVERAGE", "SPECIALTY ROAST • PURE FLAVOR"),
-        "furniture": ("🪑", "MODERN FURNITURE", "ERGONOMIC CRAFT • SOLID WOOD"),
-        "general": ("📦", "PREMIUM PRODUCT", "VERIFIED AUTHENTIC • TOP TIER")
-    }
+    @classmethod
+    def _draw_product_artwork(cls, draw: ImageDraw.ImageDraw, category: str, cx: int, cy: int, accent: tuple, text_col: tuple):
+        """Draws a clean, high-definition stylized product vector."""
+        cat = category.lower()
+        if cat == "electronics":
+            # Over-ear Headphones
+            # Headband arc
+            draw.arc((cx - 90, cy - 95, cx + 90, cy + 30), start=180, end=360, fill=text_col, width=12)
+            draw.arc((cx - 75, cy - 85, cx + 75, cy + 20), start=190, end=350, fill=accent, width=4)
+            # Left & right ear cups
+            draw.rounded_rectangle((cx - 105, cy - 25, cx - 65, cy + 55), radius=16, fill=text_col, outline=accent, width=3)
+            draw.rounded_rectangle((cx + 65, cy - 25, cx + 105, cy + 55), radius=16, fill=text_col, outline=accent, width=3)
+            # Inner speaker cushions
+            draw.ellipse((cx - 95, cy - 10, cx - 75, cy + 40), fill=accent)
+            draw.ellipse((cx + 75, cy - 10, cx + 95, cy + 40), fill=accent)
+            # Sound waves
+            draw.arc((cx - 130, cy - 15, cx - 110, cy + 45), start=110, end=250, fill=accent, width=3)
+            draw.arc((cx + 110, cy - 15, cx + 130, cy + 45), start=290, end=70, fill=accent, width=3)
+
+        elif cat == "watches":
+            # Luxury Chronograph Watch
+            # Watch Straps
+            draw.rounded_rectangle((cx - 30, cy - 105, cx + 30, cy - 50), radius=6, fill=text_col)
+            draw.rounded_rectangle((cx - 30, cy + 50, cx + 30, cy + 105), radius=6, fill=text_col)
+            # Outer Bezel
+            draw.ellipse((cx - 65, cy - 65, cx + 65, cy + 65), fill=accent, outline=text_col, width=4)
+            # Dial Face
+            draw.ellipse((cx - 52, cy - 52, cx + 52, cy + 52), fill=(255, 255, 255), outline=text_col, width=2)
+            # Hour markers & Subdials
+            draw.ellipse((cx - 18, cy - 25, cx + 18, cy + 5), fill=(240, 245, 250), outline=accent, width=1)
+            # Watch Hands
+            draw.line([(cx, cy), (cx, cy - 35)], fill=text_col, width=4)
+            draw.line([(cx, cy), (cx + 26, cy + 12)], fill=accent, width=3)
+            draw.ellipse((cx - 5, cy - 5, cx + 5, cy + 5), fill=accent)
+
+        elif cat == "footwear":
+            # Athletic Sneaker
+            # Outsole
+            draw.polygon([
+                (cx - 90, cy + 45), (cx + 85, cy + 45), (cx + 95, cy + 30),
+                (cx + 80, cy + 20), (cx + 40, cy + 20), (cx - 20, cy + 35),
+                (cx - 75, cy + 35), (cx - 90, cy + 45)
+            ], fill=accent, outline=text_col)
+            # Sneaker Body Upper
+            draw.polygon([
+                (cx - 85, cy + 35), (cx - 80, cy - 5), (cx - 55, cy - 25),
+                (cx - 20, cy - 15), (cx + 25, cy - 5), (cx + 70, cy + 10),
+                (cx + 80, cy + 20), (cx - 20, cy + 35)
+            ], fill=text_col)
+            # Collar & Swoosh line
+            draw.arc((cx - 65, cy - 30, cx - 15, cy + 5), start=180, end=360, fill=accent, width=4)
+            draw.line([(cx - 40, cy + 15), (cx + 10, cy + 22), (cx + 55, cy + 12)], fill=accent, width=5)
+
+        elif cat == "cosmetics":
+            # Premium Skincare Bottle
+            # Glass Bottle Body
+            draw.rounded_rectangle((cx - 38, cy - 30, cx + 38, cy + 65), radius=16, fill=(245, 250, 255), outline=accent, width=3)
+            # Liquid level
+            draw.rounded_rectangle((cx - 32, cy + 5, cx + 32, cy + 58), radius=10, fill=accent)
+            # Gold Collar & Dropper Cap
+            draw.rounded_rectangle((cx - 22, cy - 55, cx + 22, cy - 30), radius=4, fill=text_col)
+            draw.rounded_rectangle((cx - 12, cy - 80, cx + 12, cy - 55), radius=8, fill=accent)
+
+        elif cat == "beverages":
+            # Modern Artisan Cup / Tumbler
+            draw.polygon([
+                (cx - 45, cy - 45), (cx + 45, cy - 45),
+                (cx + 34, cy + 60), (cx - 34, cy + 60)
+            ], fill=(245, 250, 255), outline=text_col)
+            # Cup Sleeve
+            draw.polygon([
+                (cx - 40, cy - 10), (cx + 40, cy - 10),
+                (cx + 36, cy + 30), (cx - 36, cy + 30)
+            ], fill=accent)
+            # Steam curves
+            draw.arc((cx - 25, cy - 85, cx - 5, cy - 50), start=240, end=60, fill=accent, width=3)
+            draw.arc((cx + 5, cy - 85, cx + 25, cy - 50), start=240, end=60, fill=accent, width=3)
+
+        elif cat == "fashion":
+            # Luxury Apparel Coat / Blazer Silhouette
+            draw.polygon([
+                (cx, cy - 65), (cx - 75, cy - 35), (cx - 55, cy + 65),
+                (cx - 25, cy + 65), (cx, cy - 10), (cx + 25, cy + 65),
+                (cx + 55, cy + 65), (cx + 75, cy - 35)
+            ], fill=text_col, outline=accent)
+            # Lapel Collar
+            draw.polygon([(cx, cy - 65), (cx - 25, cy - 10), (cx, cy + 15), (cx + 25, cy - 10)], fill=accent)
+
+        elif cat == "furniture":
+            # Modern Armchair
+            # Seat Cushion & Backrest
+            draw.rounded_rectangle((cx - 60, cy - 65, cx + 60, cy + 15), radius=18, fill=text_col)
+            draw.rounded_rectangle((cx - 68, cy + 5, cx + 68, cy + 35), radius=12, fill=accent)
+            # Wooden Legs
+            draw.line([(cx - 45, cy + 35), (cx - 58, cy + 78)], fill=text_col, width=6)
+            draw.line([(cx + 45, cy + 35), (cx + 58, cy + 78)], fill=text_col, width=6)
+
+        else:
+            # General Product Box
+            draw.rounded_rectangle((cx - 55, cy - 55, cx + 55, cy + 55), radius=16, fill=accent, outline=text_col, width=3)
+            draw.line([(cx - 55, cy), (cx + 55, cy)], fill=text_col, width=4)
+            draw.line([(cx, cy - 55), (cx, cy + 55)], fill=text_col, width=4)
 
     @classmethod
     def generate_product_image(
@@ -138,7 +255,7 @@ class ProductImageStudio:
         category: str = "electronics",
         tagline: str = "Premium Quality & Ergonomic Design",
         price: str = "$199.00",
-        badge: str = "FEATURED PRODUCT",
+        badge: str = "BESTSELLER",
         theme: str = "studio_white",
         width: int = 800,
         height: int = 800
@@ -147,7 +264,7 @@ class ProductImageStudio:
         img = Image.new("RGB", (width, height), t["bg_top"])
         draw = ImageDraw.Draw(img)
 
-        # 1. Gradient Background
+        # 1. Gradient Studio Background
         for y in range(height):
             ratio = y / float(height)
             r = int(t["bg_top"][0] * (1 - ratio) + t["bg_bottom"][0] * ratio)
@@ -158,9 +275,9 @@ class ProductImageStudio:
         # 2. Studio Spotlight Glow
         spotlight = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         sp_draw = ImageDraw.Draw(spotlight)
-        center_x, center_y = width // 2, int(height * 0.44)
-        for r in range(280, 0, -12):
-            alpha = int(28 * (1 - r / 280.0))
+        center_x, center_y = width // 2, int(height * 0.40)
+        for r in range(300, 0, -12):
+            alpha = int(32 * (1 - r / 300.0))
             sp_draw.ellipse(
                 (center_x - r, center_y - int(r * 0.65), center_x + r, center_y + int(r * 0.65)),
                 fill=(255, 255, 255, alpha)
@@ -169,59 +286,60 @@ class ProductImageStudio:
         draw = ImageDraw.Draw(img)
 
         # 3. 3D Floating Stage Pedestal
-        ped_w, ped_h = int(width * 0.68), int(height * 0.16)
-        ped_x1, ped_y1 = (width - ped_w) // 2, int(height * 0.56)
+        ped_w, ped_h = int(width * 0.72), int(height * 0.16)
+        ped_x1, ped_y1 = (width - ped_w) // 2, int(height * 0.54)
         ped_x2, ped_y2 = ped_x1 + ped_w, ped_y1 + ped_h
 
         # Ground Shadow
-        draw.ellipse((ped_x1 - 25, ped_y1 + 15, ped_x2 + 25, ped_y2 + 35), fill=(0, 0, 0, 25) if theme != "studio_white" else (210, 220, 230))
+        draw.ellipse((ped_x1 - 30, ped_y1 + 18, ped_x2 + 30, ped_y2 + 38), fill=(0, 0, 0, 25) if theme != "studio_white" else (205, 215, 228))
         # Pedestal Sides
-        draw.ellipse((ped_x1, ped_y1 + 10, ped_x2, ped_y2 + 10), fill=t["pedestal_side"])
+        draw.ellipse((ped_x1, ped_y1 + 12, ped_x2, ped_y2 + 12), fill=t["pedestal_side"])
         # Pedestal Top Platform
         draw.ellipse((ped_x1, ped_y1, ped_x2, ped_y2), fill=t["pedestal_top"])
         draw.ellipse((ped_x1 + 4, ped_y1 + 2, ped_x2 - 4, ped_y2 - 2), outline=t["accent"], width=2)
 
-        # 4. Center Product Visual Hero Card
-        box_w, box_h = int(width * 0.40), int(height * 0.38)
-        bx1 = (width - box_w) // 2
-        by1 = int(height * 0.22)
-        bx2 = bx1 + box_w
-        by2 = by1 + box_h
+        # 4. Hero Product Card Container & Artwork
+        hero_w, hero_h = int(width * 0.46), int(height * 0.38)
+        hx1, hy1 = (width - hero_w) // 2, int(height * 0.17)
+        hx2, hy2 = hx1 + hero_w, hy1 + hero_h
 
-        # Hero product box with layered rounded borders
-        draw.rounded_rectangle((bx1 - 4, by1 - 4, bx2 + 4, by2 + 4), radius=32, fill=(0, 0, 0, 15) if theme != "studio_white" else (225, 235, 245))
-        draw.rounded_rectangle((bx1, by1, bx2, by2), radius=28, fill=t["pedestal_top"], outline=t["accent"], width=3)
+        # Soft shadow behind card
+        draw.rounded_rectangle((hx1 - 4, hy1 + 4, hx2 + 4, hy2 + 12), radius=32, fill=(0, 0, 0, 20) if theme != "studio_white" else (218, 226, 236))
+        # Main Hero Card
+        draw.rounded_rectangle((hx1, hy1, hx2, hy2), radius=28, fill=t["card_bg"], outline=t["accent"], width=3)
 
-        # Category iconography
-        cat_key = category.lower()
-        symbol, title_line, sub_line = cls.CATEGORY_SYMBOLS.get(cat_key, cls.CATEGORY_SYMBOLS["general"])
+        # Render Authentic Category Illustration
+        art_cy = hy1 + int(hero_h * 0.50)
+        cls._draw_product_artwork(draw, category, width // 2, art_cy, t["accent"], t["text"])
 
-        draw.text((width // 2, by1 + int(box_h * 0.28)), symbol, fill=t["accent"], anchor="mm")
-        draw.text((width // 2, by1 + int(box_h * 0.52)), title_line, fill=t["text"], anchor="mm")
-        draw.text((width // 2, by1 + int(box_h * 0.70)), sub_line, fill=t["subtext"], anchor="mm")
-        draw.text((width // 2, by1 + int(box_h * 0.86)), "★ ★ ★ ★ ★", fill=t["accent"], anchor="mm")
-
-        # 5. Top Highlight Badge Pill
+        # 5. Top Badge Pill (Large TrueType Font)
         if badge:
             badge_str = badge.upper().strip()
-            bw = len(badge_str) * 9 + 32
-            bh = 32
-            draw.rounded_rectangle(((width - bw) // 2, int(height * 0.08), (width + bw) // 2, int(height * 0.08) + bh), radius=16, fill=t["accent"])
-            draw.text((width // 2, int(height * 0.08) + bh // 2), badge_str, fill=(255, 255, 255), anchor="mm")
+            font_badge = _get_font(18, bold=True)
+            bw = len(badge_str) * 11 + 36
+            bh = 36
+            bx1, by1 = (width - bw) // 2, int(height * 0.05)
+            draw.rounded_rectangle((bx1, by1, bx1 + bw, by1 + bh), radius=18, fill=t["accent"])
+            draw.text((width // 2, by1 + bh // 2), badge_str, fill=(255, 255, 255), font=font_badge, anchor="mm")
 
-        # 6. Product Name & Tagline
+        # 6. Product Name & Tagline (Large TrueType Typography)
         clean_name = product_name.strip() if product_name else "Studio Product"
-        draw.text((width // 2, int(height * 0.76)), clean_name, fill=t["text"], anchor="mm")
-        if tagline:
-            draw.text((width // 2, int(height * 0.82)), tagline, fill=t["subtext"], anchor="mm")
+        font_title = _get_font(30, bold=True)
+        draw.text((width // 2, int(height * 0.74)), clean_name, fill=t["text"], font=font_title, anchor="mm")
 
-        # 7. Price Badge
+        if tagline:
+            font_tagline = _get_font(18, bold=False)
+            draw.text((width // 2, int(height * 0.81)), tagline.strip(), fill=t["subtext"], font=font_tagline, anchor="mm")
+
+        # 7. Price Badge (Large Bold Pill)
         if price:
             p_str = price.strip()
-            pw = len(p_str) * 12 + 40
-            ph = 38
-            draw.rounded_rectangle(((width - pw) // 2, int(height * 0.88), (width + pw) // 2, int(height * 0.88) + ph), radius=19, fill=t["text"])
-            draw.text((width // 2, int(height * 0.88) + ph // 2), p_str, fill=(255, 255, 255) if theme == "studio_white" else t["bg_top"], anchor="mm")
+            font_price = _get_font(24, bold=True)
+            pw = len(p_str) * 14 + 48
+            ph = 44
+            px1, py1 = (width - pw) // 2, int(height * 0.87)
+            draw.rounded_rectangle((px1, py1, px1 + pw, py1 + ph), radius=22, fill=t["text"])
+            draw.text((width // 2, py1 + ph // 2), p_str, fill=(255, 255, 255) if theme in ["studio_white", "minimalist_pastel", "warm_wood"] else t["bg_top"], font=font_price, anchor="mm")
 
         buf = io.BytesIO()
         img.save(buf, format="PNG", quality=95)
