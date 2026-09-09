@@ -1,5 +1,5 @@
 /**
- * API Service for QR Reader System
+ * API Service for QR Reader System & Productivity Studio Tools
  * Handles communication with the FastAPI backend and includes offline client-side fallback parsing.
  */
 
@@ -37,7 +37,6 @@ export const parseRawData = async (rawData) => {
     console.warn('Backend parse failed, using client-side fallback:', err);
   }
 
-  // Client-side fallback if server is unreachable
   return clientSideParse(rawData);
 };
 
@@ -56,6 +55,36 @@ export const generateQR = async (qrType, params, fillColor = '#0f172a', backColo
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Failed to generate QR' }));
     throw new Error(err.detail || 'Failed to generate QR');
+  }
+
+  return response.json();
+};
+
+export const generateProductImage = async (productData) => {
+  const response = await fetch(`${API_BASE}/tools/generate-product-image`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(productData),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Failed to generate product image' }));
+    throw new Error(err.detail || 'Failed to generate product image');
+  }
+
+  return response.json();
+};
+
+export const processText = async (textData) => {
+  const response = await fetch(`${API_BASE}/tools/process-text`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(textData),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Failed to process text' }));
+    throw new Error(err.detail || 'Failed to process text');
   }
 
   return response.json();

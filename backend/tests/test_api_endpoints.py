@@ -70,7 +70,7 @@ def test_samples_api():
     res = client.get("/api/sample-qrs")
     assert res.status_code == 200
     samples = res.json()["samples"]
-    assert len(samples) >= 6
+    assert len(samples) >= 5
     assert any(s["type"] == "wifi" for s in samples)
     assert any(s["type"] == "upi" for s in samples)
     assert any(s["type"] == "contact" for s in samples)

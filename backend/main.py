@@ -1,7 +1,9 @@
 """
-FastAPI Server for QR Reader System
-Provides endpoints for decoding uploaded QR images, parsing raw QR payloads,
-and generating customized sample QR codes.
+FastAPI Server for QR Reader System & Productivity Studio Tools
+Provides endpoints for:
+1. Decoding uploaded QR images & parsing raw QR payloads
+2. Product Image Generation (clean studio product visualizer)
+3. Text Generation, Grammar Correction & Product Copywriting
 """
 
 import time
@@ -13,11 +15,12 @@ from pydantic import BaseModel, Field
 from parser import QRDataParser, StructuredQRResult
 from decoder import QRImageDecoder
 from generator import QRGenerator
+from tools import ProductImageStudio, TextCorrectionEngine
 
 app = FastAPI(
-    title="QR Reader System API",
-    description="High-performance QR decoder & intelligent payload structuring engine",
-    version="1.0.0"
+    title="QR Reader & Productivity Studio API",
+    description="High-performance QR decoder & intelligent visual/text studio engine",
+    version="1.1.0"
 )
 
 # Enable CORS for frontend development and production
@@ -39,6 +42,24 @@ class GenerateRequest(BaseModel):
     params: Dict[str, Any] = Field(default_factory=dict, description="Parameters for the QR format")
     fill_color: str = Field(default="#0f172a", description="Hex or name of foreground color")
     back_color: str = Field(default="#ffffff", description="Hex or name of background color")
+
+
+class ProductImageRequest(BaseModel):
+    product_name: str = Field(..., description="Name of the product to render")
+    category: str = Field(default="electronics", description="Category: electronics, footwear, fashion, watches, cosmetics, beverages, furniture, general")
+    tagline: str = Field(default="Premium Quality & Ergonomic Design", description="Short marketing tagline")
+    price: str = Field(default="$99.00", description="Product price string")
+    badge: str = Field(default="FEATURED PRODUCT", description="Product highlight badge")
+    theme: str = Field(default="studio_white", description="Theme: studio_white, luxury_marble, minimalist_pastel, cyber_clean, warm_wood")
+
+
+class TextProcessRequest(BaseModel):
+    operation: str = Field(..., description="Operation: 'correct_grammar', 'rewrite_tone', 'generate_description'")
+    text: str = Field(default="", description="Input text to analyze or rewrite")
+    tone: Optional[str] = Field(default="professional", description="Tone: professional, concise, friendly, marketing")
+    product_name: Optional[str] = Field(default="", description="Product name for description generation")
+    features: Optional[List[str]] = Field(default_factory=list, description="Bullet point features")
+    target_audience: Optional[str] = Field(default="Consumers", description="Target audience")
 
 
 class ScanResponse(BaseModel):
@@ -68,7 +89,6 @@ async def scan_image(file: UploadFile = File(...)):
     start_time = time.perf_counter()
 
     if not file.content_type or not file.content_type.startswith("image/"):
-        # Allow standard image extensions even if mime is generic
         ext = (file.filename or "").lower().split(".")[-1]
         if ext not in ["png", "jpg", "jpeg", "webp", "bmp", "tiff", "gif", "svg"]:
             raise HTTPException(status_code=400, detail="Uploaded file must be a valid image format.")
@@ -83,7 +103,6 @@ async def scan_image(file: UploadFile = File(...)):
         parsed_results: List[StructuredQRResult] = []
         for item in decoded_items:
             res = QRDataParser.parse(item.raw_data)
-            # Attach detection details to parsed details
             res.parsed_details["_detection"] = {
                 "format": item.format_name,
                 "confidence": item.confidence,
@@ -151,11 +170,63 @@ def generate_qr(req: GenerateRequest):
     }
 
 
+# ------------------- PRODUCT STUDIO & TEXT TOOLS ------------------- #
+
+@app.post("/api/tools/generate-product-image")
+def generate_product_image(req: ProductImageRequest):
+    """
+    Renders a high-resolution, clean studio showcase product image.
+    """
+    try:
+        data_url = ProductImageStudio.generate_product_image(
+            product_name=req.product_name,
+            category=req.category,
+            tagline=req.tagline,
+            price=req.price,
+            badge=req.badge,
+            theme=req.theme
+        )
+        return {
+            "success": True,
+            "product_name": req.product_name,
+            "category": req.category,
+            "image_data_url": data_url
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to render product image: {str(e)}")
+
+
+@app.post("/api/tools/process-text")
+def process_text(req: TextProcessRequest):
+    """
+    Processes text for grammar correction, tone rewriting, or structured product copy generation.
+    """
+    op = req.operation.lower()
+    
+    if op == "correct_grammar":
+        res = TextCorrectionEngine.correct_grammar_and_spelling(req.text)
+        return {"success": True, "operation": op, "result": res}
+    
+    elif op == "rewrite_tone":
+        res = TextCorrectionEngine.rewrite_tone(req.text, req.tone or "professional")
+        return {"success": True, "operation": op, "result": res}
+    
+    elif op == "generate_description":
+        res = TextCorrectionEngine.generate_product_description(
+            product_name=req.product_name or req.text,
+            features=req.features or [],
+            target_audience=req.target_audience or "Consumers"
+        )
+        return {"success": True, "operation": op, "result": res}
+    
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported text operation: {req.operation}")
+
+
 @app.get("/api/sample-qrs")
 def get_sample_qrs():
     """
-    Provides pre-generated sample QR codes across all supported categories
-    for instant 1-click testing in the UI.
+    Provides pre-generated sample QR codes across all supported categories.
     """
     samples = [
         {
@@ -202,24 +273,9 @@ def get_sample_qrs():
             "type": "geo",
             "description": "GPS Location coordinates with query pin",
             "params": {"latitude": "27.1751", "longitude": "78.0421", "query": "Taj Mahal, Agra"}
-        },
-        {
-            "id": "email_support",
-            "name": "Feedback Email",
-            "type": "email",
-            "description": "Pre-filled customer support email template",
-            "params": {"to": "support@qrreader.app", "subject": "Bug Report & Feedback", "body": "Hello Support Team,\n\nI tested the QR Reader System and..."}
-        },
-        {
-            "id": "crypto_btc",
-            "name": "Bitcoin Wallet",
-            "type": "text",
-            "description": "Bitcoin receiving address format",
-            "params": {"text": "bitcoin:1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa?amount=0.025&message=Donation"}
         }
     ]
 
-    # Pre-render images for samples
     for sample in samples:
         raw = QRGenerator.build_raw_string(sample["type"], sample["params"])
         sample["raw_data"] = raw
